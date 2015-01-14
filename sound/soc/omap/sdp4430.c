@@ -1,5 +1,5 @@
 /*
- * tuna.c  --  SoC audio for Tuna
+ * sdp4430.c  --  SoC audio for TI OMAP4430 SDP
  *
  * Author: Misael Lopez Cruz <x0052729@ti.com>
  *
@@ -45,8 +45,8 @@
 
 #include "../../../arch/arm/mach-omap2/board-tuna.h"
 
-#define TUNA_MAIN_MIC_GPIO 48
-#define TUNA_SUB_MIC_GPIO 171
+#define TUNA_MAIN_MIC_GPIO  48
+#define TUNA_SUB_MIC_GPIO   171
 
 static int twl6040_power_mode;
 static int mcbsp_cfg;
@@ -240,12 +240,17 @@ static int sdp4430_mcbsp_hw_params(struct snd_pcm_substream *substream,
 	unsigned int be_id, fmt;
 
 
-	be_id = rtd->dai_link->be_id;
+        be_id = rtd->dai_link->be_id;
 
 	if (be_id == OMAP_ABE_DAI_BT_VX) {
-		fmt = SND_SOC_DAIFMT_I2S |
-			SND_SOC_DAIFMT_NB_NF |
-			SND_SOC_DAIFMT_CBM_CFM;
+		if (machine_is_tuna())
+			fmt = SND_SOC_DAIFMT_I2S |
+				SND_SOC_DAIFMT_NB_NF |
+				SND_SOC_DAIFMT_CBM_CFM;
+		else
+			fmt = SND_SOC_DAIFMT_DSP_B |
+				SND_SOC_DAIFMT_NB_IF |
+				SND_SOC_DAIFMT_CBM_CFM;
 	} else {
 		fmt = SND_SOC_DAIFMT_I2S |
 			SND_SOC_DAIFMT_NB_NF |
@@ -264,8 +269,8 @@ static int sdp4430_mcbsp_hw_params(struct snd_pcm_substream *substream,
 	 */
 	/* Set McBSP clock to external */
 	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_MCBSP_SYSCLK_CLKS_FCLK,
-					32 * 96 * params_rate(params),
-					SND_SOC_CLOCK_IN);
+				     32 * 96 * params_rate(params),
+				     SND_SOC_CLOCK_IN);
 	if (ret < 0)
 		printk(KERN_ERR "can't set cpu system clock\n");
 
@@ -294,7 +299,7 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 			struct snd_pcm_hw_params *params)
 {
 	struct snd_interval *channels = hw_param_interval(params,
-						SNDRV_PCM_HW_PARAM_CHANNELS);
+                                       SNDRV_PCM_HW_PARAM_CHANNELS);
 	unsigned int be_id = rtd->dai_link->be_id;
 
 	if (be_id == OMAP_ABE_DAI_MM_FM)
@@ -302,8 +307,8 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	else if (be_id == OMAP_ABE_DAI_BT_VX)
 		channels->min = 2;
 	snd_mask_set(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
-					SNDRV_PCM_HW_PARAM_FIRST_MASK],
-					SNDRV_PCM_FORMAT_S16_LE);
+	                            SNDRV_PCM_HW_PARAM_FIRST_MASK],
+	                            SNDRV_PCM_FORMAT_S16_LE);
 	return 0;
 }
 
@@ -446,8 +451,10 @@ static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_add_routes(dapm, audio_map, ARRAY_SIZE(audio_map));
 
 	/* SDP4430 connected pins */
-	snd_soc_dapm_enable_pin(dapm, "Ext Main Mic");
-	snd_soc_dapm_enable_pin(dapm, "Ext Sub Mic");
+	if (machine_is_tuna()) {
+		snd_soc_dapm_enable_pin(dapm, "Ext Main Mic");
+		snd_soc_dapm_enable_pin(dapm, "Ext Sub Mic");
+	}
 	snd_soc_dapm_enable_pin(dapm, "Ext Spk");
 	snd_soc_dapm_enable_pin(dapm, "AFML");
 	snd_soc_dapm_enable_pin(dapm, "AFMR");
@@ -455,8 +462,10 @@ static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_enable_pin(dapm, "Headset Stereophone");
 
 	/* allow audio paths from the audio modem to run during suspend */
-	snd_soc_dapm_ignore_suspend(dapm, "Ext Main Mic");
-	snd_soc_dapm_ignore_suspend(dapm, "Ext Sub Mic");
+	if (machine_is_tuna()) {
+		snd_soc_dapm_ignore_suspend(dapm, "Ext Main Mic");
+		snd_soc_dapm_ignore_suspend(dapm, "Ext Sub Mic");
+	}
 	snd_soc_dapm_ignore_suspend(dapm, "Ext Spk");
 	snd_soc_dapm_ignore_suspend(dapm, "AFML");
 	snd_soc_dapm_ignore_suspend(dapm, "AFMR");
@@ -755,7 +764,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.platform_name = "omap-pcm-audio",
 
 		/* Phoenix - DL1 DAC */
-		.codec_dai_name = "twl6040-dl1",
+		.codec_dai_name =  "twl6040-dl1",
 		.codec_name = "twl6040-codec",
 
 		.ops = &sdp4430_mcpdm_ops,
@@ -787,7 +796,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.platform_name = "aess",
 
 		/* Phoenix - DL1 DAC */
-		.codec_dai_name = "twl6040-dl1",
+		.codec_dai_name =  "twl6040-dl1",
 		.codec_name = "twl6040-codec",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
@@ -805,7 +814,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.platform_name = "aess",
 
 		/* Phoenix - UL ADC */
-		.codec_dai_name = "twl6040-ul",
+		.codec_dai_name =  "twl6040-ul",
 		.codec_name = "twl6040-codec",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
@@ -822,7 +831,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.platform_name = "aess",
 
 		/* Phoenix - DL2 DAC */
-		.codec_dai_name = "twl6040-dl2",
+		.codec_dai_name =  "twl6040-dl2",
 		.codec_name = "twl6040-codec",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
@@ -840,7 +849,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.platform_name = "aess",
 
 		/* Phoenix - PDM to PWM */
-		.codec_dai_name = "twl6040-vib",
+		.codec_dai_name =  "twl6040-vib",
 		.codec_name = "twl6040-codec",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
@@ -940,7 +949,6 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 /* Audio machine driver */
 static struct snd_soc_card snd_soc_sdp4430 = {
 	.driver_name = "OMAP4",
-	.name = "Tuna",
 	.long_name = "TI OMAP4 Board",
 	.dai_link = sdp4430_dai,
 	.num_links = ARRAY_SIZE(sdp4430_dai),
@@ -954,22 +962,32 @@ static int __init sdp4430_soc_init(void)
 {
 	int ret;
 
-	if (!machine_is_tuna()) {
-		pr_debug("ASoc: not Tuna!\n");
+	if (!machine_is_omap_4430sdp() && !machine_is_omap4_panda() &&
+			!machine_is_tuna()) {
+		pr_debug("Not SDP4430, PandaBoard or Tuna!\n");
 		return -ENODEV;
 	}
-	printk(KERN_INFO "Tuna ASoC init\n");
+	printk(KERN_INFO "SDP4430 SoC init\n");
 
-	ret = gpio_request(TUNA_MAIN_MIC_GPIO, "MAIN_MICBIAS_EN");
-	if (ret)
-		goto mainmic_gpio_err;
+	if (machine_is_tuna()) {
+		ret = gpio_request(TUNA_MAIN_MIC_GPIO, "MAIN_MICBIAS_EN");
+		if (ret)
+			goto mainmic_gpio_err;
 
-	gpio_direction_output(TUNA_MAIN_MIC_GPIO, 0);
+		gpio_direction_output(TUNA_MAIN_MIC_GPIO, 0);
 
-	ret = gpio_request(TUNA_SUB_MIC_GPIO, "SUB_MICBIAS_EN");
-	if (ret)
-		goto submic_gpio_err;
-	gpio_direction_output(TUNA_SUB_MIC_GPIO, 0);
+		ret = gpio_request(TUNA_SUB_MIC_GPIO, "SUB_MICBIAS_EN");
+		if (ret)
+			goto submic_gpio_err;
+		gpio_direction_output(TUNA_SUB_MIC_GPIO, 0);
+	}
+
+	if (machine_is_omap_4430sdp())
+		snd_soc_sdp4430.name = "SDP4430";
+	else if (machine_is_omap4_panda())
+		snd_soc_sdp4430.name = "Panda";
+	else if (machine_is_tuna())
+		snd_soc_sdp4430.name = "Tuna";
 
 	sdp4430_snd_device = platform_device_alloc("soc-audio", -1);
 	if (!sdp4430_snd_device) {
@@ -996,9 +1014,11 @@ err:
 	printk(KERN_ERR "Unable to add platform device\n");
 	platform_device_put(sdp4430_snd_device);
 device_err:
-	gpio_free(TUNA_SUB_MIC_GPIO);
+	if (machine_is_tuna())
+		gpio_free(TUNA_SUB_MIC_GPIO);
 submic_gpio_err:
-	gpio_free(TUNA_MAIN_MIC_GPIO);
+	if (machine_is_tuna())
+		gpio_free(TUNA_MAIN_MIC_GPIO);
 mainmic_gpio_err:
 	return ret;
 }
@@ -1006,13 +1026,15 @@ module_init(sdp4430_soc_init);
 
 static void __exit sdp4430_soc_exit(void)
 {
-	gpio_free(TUNA_SUB_MIC_GPIO);
-	gpio_free(TUNA_MAIN_MIC_GPIO);
+	if (machine_is_tuna()) {
+		gpio_free(TUNA_SUB_MIC_GPIO);
+		gpio_free(TUNA_MAIN_MIC_GPIO);
+	}
 	platform_device_unregister(sdp4430_snd_device);
 }
 module_exit(sdp4430_soc_exit);
 
 MODULE_AUTHOR("Misael Lopez Cruz <x0052729@ti.com>");
-MODULE_DESCRIPTION("ALSA SoC Tuna");
+MODULE_DESCRIPTION("ALSA SoC SDP4430");
 MODULE_LICENSE("GPL");
 
